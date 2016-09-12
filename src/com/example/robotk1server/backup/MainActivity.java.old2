@@ -1,0 +1,278 @@
+package com.example.robotk1server;
+
+import com.example.robotk1server.R;
+
+import org.microbridge.server.Server;
+import org.microbridge.server.AbstractServerListener;
+
+import android.os.Bundle;
+import android.app.Activity;
+import android.view.Menu;
+import android.widget.Toast;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.Enumeration;
+
+import android.os.AsyncTask;
+import android.util.Log;
+import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.TextView;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.OnTouchListener;
+import android.widget.SeekBar;
+import android.content.*;
+import android.widget.VideoView;
+import android.widget.MediaController;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.MediaPlayer.OnPreparedListener;
+import android.media.MediaPlayer.OnCompletionListener;
+import android.media.MediaPlayer.OnErrorListener;
+import android.widget.MediaController;
+import android.widget.MediaController.MediaPlayerControl;
+import android.view.ViewGroup.LayoutParams;
+import android.widget.LinearLayout;
+import android.media.MediaPlayer;
+import android.os.Environment;
+
+public class MainActivity extends Activity implements OnTouchListener {
+	Server server = null;
+	private final int DATA_LENGTH = 54;
+	byte[] data = new byte[DATA_LENGTH];
+
+	Button bFront, bBack, bLeft, bRight, bUp1, bDown1, bUp2, bDown2, bManip1On, bManip1Off, bManip2On, bManip2Off;
+	TextView textView1;
+	Context context;
+	Thread serverThread;
+	private final int SERVER_PORT = 4567; //Define the server port
+//	MyVideoView videoView;	 
+	VideoView videoView;	
+	MediaPlayer mediaPlayer = null;
+	
+	 @Override
+	 protected void onCreate(Bundle savedInstanceState) {
+	  super.onCreate(savedInstanceState);
+	  setContentView(R.layout.activity_main);
+	  
+	  context = this.getApplicationContext(); 
+
+		String videoSource ="/sdcard/morg.mp4";
+//		videoView = (MyVideoView) findViewById(R.id.videoView1);
+		videoView = (VideoView) findViewById(R.id.videoView1);
+
+		videoView.setOnCompletionListener(new OnCompletionListener() {
+
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+            	videoView.resume();
+                }
+        });
+
+		videoView.setOnPreparedListener(new OnPreparedListener() {
+
+            @Override
+            public void onPrepared(MediaPlayer mp) {
+                mp.setLooping(true);
+                videoView.start();                
+            }
+        });
+        
+		videoView.setVideoPath(videoSource);
+//	    int width = videoView.getMeasuredWidth();
+//	    int height = videoView.getMeasuredHeight();
+//	    LayoutParams params = new LinearLayout.LayoutParams(width+10, height+10);
+//	    videoView.setLayoutParams(params);
+		
+		MediaController mc = new MediaController(this);
+		mc.setVisibility(View.INVISIBLE);
+		videoView.setMediaController(mc);
+		videoView.requestFocus(0);
+		videoView.start();
+		mediaPlayer = new MediaPlayer();
+		
+	  for (int i=0; i<DATA_LENGTH; i++){
+    	  data[i] = 0;
+      }
+      
+	  try
+		{
+			server = new Server(4568); //Этот же порт необходимо использовать и на ADK-плате
+			server.start();
+		
+		} catch (IOException e)
+		{
+			Toast.makeText(this.getApplicationContext(), "error", Toast.LENGTH_SHORT).show();
+			System.exit(-1);
+		}
+
+	  server.addListener(new AbstractServerListener() {
+          @Override
+          public void onReceive(org.microbridge.server.Client client, byte[] data)
+          {
+//        	  textView1.setText(data.toString());
+          }
+      });	  
+	  
+	  serverThread = new Thread(new Runnable() {
+   	   public void run() {
+   	    try {
+   	     ServerSocket socServer = new ServerSocket(SERVER_PORT);
+   	     Socket socClient = null;
+   	     while (true) {
+   	      socClient = socServer.accept();
+   	      new ServerThread(socClient).start();
+//   	      ServerAsyncTask serverAsyncTask = new ServerAsyncTask();
+//   	      serverAsyncTask.execute(new Socket[] {socClient});
+   	      
+   	     }
+   	    } catch (IOException e) {
+   	     e.printStackTrace();
+   	    }
+   	   }  	  });
+	  serverThread.start();
+      
+	 }	  
+	 
+	 @Override
+	 public boolean onCreateOptionsMenu(Menu menu) {
+	  getMenuInflater().inflate(R.menu.main, menu);
+	  return true;
+	 }
+	 
+	 @Override
+	 public boolean onOptionsItemSelected(MenuItem item) {
+	  int id = item.getItemId();
+	  if (id == R.id.action_settings) {
+	   return true;
+	  }
+	  return super.onOptionsItemSelected(item);
+	 }
+	 
+	 @Override
+	 protected void onDestroy (){
+		 super.onDestroy();
+		 server.stop();
+//		 try{
+			 serverThread.stop();
+//			 socServer.close();
+			 serverThread.destroy();
+//		 } catch(IOException e) {};
+	 }
+	 
+	  @Override
+	  public boolean onTouch(View v, MotionEvent event) {
+		 return false;	
+	 }    
+	 
+ 	public static byte b2i(boolean value) {
+ 		byte one = 1;
+ 		byte nul = 0;
+		return value ? one : nul;
+	}
+
+	    class ServerThread extends Thread implements Runnable {
+//			Socket mySocket;
+//    	    PrintWriter out;
+    	    BufferedReader in;
+    	    InputStreamReader is;
+    	    
+			ServerThread(Socket socket) {
+	    	   Socket mySocket = socket;
+				try{
+					is = new InputStreamReader(mySocket.getInputStream());
+		    	    in = new BufferedReader(is);
+//					in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+//		    	    out = new PrintWriter(mySocket.getOutputStream(), true);
+//		    	    out.println("robot-k1:>");
+				}catch(Exception ex) {
+				    ex.printStackTrace();
+				}
+			}
+			
+			public void run() {
+//				while (1==1){
+					try{
+//			    	    char[] dd = new char[DATA_LENGTH];
+//			    	    in.read(dd);
+//	    	    		out.println(str);
+//						server.send(in.readLine());
+						String val = in.readLine();
+						try{
+							server.send(val.substring(0, 54));
+						}catch(Exception ex) {
+						    ex.printStackTrace();
+						}
+//						runFunctions(val);
+						String filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+"/"+val.substring(54);
+						MediaPlayer mediaPlayer = new  MediaPlayer();
+						try{
+							mediaPlayer.setDataSource(filePath);
+							mediaPlayer.prepare();   
+							mediaPlayer.start();
+						} catch (Exception ex) {};
+
+					}catch(Exception ex) {
+					    ex.printStackTrace();
+					}
+//				}
+			}
+		}
+
+	    public void runFunctions(String val){
+//			Toast.makeText(context, val, Toast.LENGTH_SHORT).show();
+			try{
+//				server.send(val.substring(0, 54));
+				server.send(val);
+			}catch(Exception ex) {
+			    ex.printStackTrace();
+			}
+	    	
+//			loadSound(val.substring(54));
+	    }
+	    
+	    public void loadSound(String filename){
+			try{
+/*				File file = context.getFileStreamPath(filename);
+				if (file.exists()) {
+					file = null;
+	*/		    	mediaPlayer.setDataSource(filename);
+					mediaPlayer.start();
+		/*		} else {
+					filename = "/sdcard/nosound.wav";
+					file = context.getFileStreamPath(filename);
+					if (file.exists()) {
+						file = null;
+				    	mediaPlayer.setDataSource(filename);
+						mediaPlayer.start();
+					};
+				};*/
+			} catch(Exception ex) {};
+	    }
+	    
+	    public class MyVideoView extends VideoView {
+	    	public MyVideoView(Context context) {
+	    		super(context);
+	    	}
+
+			@Override
+	    	 protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+//	    	  int width = getDefaultSize(0, widthMeasureSpec);
+//	    	  int height = getDefaultSize(0, heightMeasureSpec);
+
+//	    	  setMeasuredDimension(width, height);
+	    	 }
+	    }
+}
+

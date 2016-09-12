@@ -1,0 +1,357 @@
+package com.example.robotk1server;
+
+import com.example.robotk1server.R;
+
+import org.microbridge.server.Server;
+import org.microbridge.server.AbstractServerListener;
+
+import android.os.Bundle;
+import android.os.Handler;
+import android.app.Activity;
+import android.view.Menu;
+import android.widget.Toast;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.Enumeration;
+
+import android.os.AsyncTask;
+import android.util.Log;
+import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.TextView;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.OnTouchListener;
+import android.widget.SeekBar;
+import android.content.*;
+import android.widget.VideoView;
+import android.widget.MediaController;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.MediaPlayer.OnPreparedListener;
+import android.media.MediaPlayer.OnCompletionListener;
+import android.media.MediaPlayer.OnErrorListener;
+import android.widget.MediaController;
+import android.widget.MediaController.MediaPlayerControl;
+import android.view.ViewGroup.LayoutParams;
+import android.widget.LinearLayout;
+import android.os.Environment;
+
+public class MainActivity extends Activity implements OnTouchListener {
+	static Server server = null;
+	static byte[] data = new byte[54];
+
+	Button bFront, bBack, bLeft, bRight, bUp1, bDown1, bUp2, bDown2, bManip1On, bManip1Off, bManip2On, bManip2Off;
+	TextView textView1;
+	Context context;
+	Thread serverThread;
+	public int CLOSE_APP = 0;
+	private final int SERVER_PORT = 4567; //Define the server port
+//	MyVideoView videoView;	 
+	VideoView videoView;
+	Handler h;
+	MediaPlayer mediaPlayer;
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+		context = this.getApplicationContext(); 
+		
+		try {
+			server = new Server(4568); //ADK-port
+			server.start();
+			 
+		} catch (IOException e) {
+			Toast.makeText(this.getApplicationContext(), "error", Toast.LENGTH_SHORT).show();
+			System.exit(-1);
+		}
+		 
+		server.addListener(new AbstractServerListener() {
+			@Override
+			public void onReceive(org.microbridge.server.Client client, byte[] data) {
+			}
+		});
+		 
+		 
+		serverThread = new Thread(new Runnable() {
+			public void run() {
+				try {
+					ServerSocket socServer = new ServerSocket(SERVER_PORT);
+					Socket socClient = null;
+					while (true) {
+						socClient = socServer.accept();
+						new ServerThread(socClient).start();
+//						ServerAsyncTask serverAsyncTask = new ServerAsyncTask();
+//						serverAsyncTask.execute(new Socket[] {socClient});
+   	      
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		});
+		serverThread.start();
+
+		String videoSource ="/sdcard/morg.mp4";
+		videoView = (VideoView) findViewById(R.id.videoView1);
+		videoView.setOnCompletionListener(new OnCompletionListener() {
+			@Override
+			public void onCompletion(MediaPlayer mp) {
+				videoView.resume();
+			}
+		});
+
+		videoView.setOnPreparedListener(new OnPreparedListener() {
+           @Override
+           public void onPrepared(MediaPlayer mp) {
+        	   mp.setLooping(true);
+        	   videoView.start();                
+           }
+		});
+        
+		videoView.setVideoPath(videoSource);
+		MediaController mc = new MediaController(this);
+		mc.setVisibility(View.INVISIBLE);
+		videoView.setMediaController(mc);
+		videoView.requestFocus(0);
+		videoView.start();
+		
+		playSound("nosound.m4a");
+		
+		for (int i=0; i<=53; i++) {
+    	  data[i] = 0;
+		}
+		
+		h = new Handler() {
+			@Override
+			public void handleMessage(android.os.Message msg) {
+	    		switch (msg.what) {
+	            case 1:
+					String str = (String) msg.obj;// 
+					String val = str.substring(3);
+					byte pwmCount = Byte.valueOf(str.substring(0, 3));
+					sss(val.substring(pwmCount*3), val.substring(0, (pwmCount*3)-3));
+					
+					final int soundNumber = val.length() >= pwmCount*3 ? Byte.valueOf(val.substring((pwmCount*3)-3, pwmCount*3)) : 0;
+					if (soundNumber > 0) {
+						Toast.makeText(context, String.format("%03d", soundNumber)+".m4a", Toast.LENGTH_SHORT).show();
+						playSound(String.format("%03d", soundNumber)+".m4a");
+					} 
+					break;
+	    		}
+	        }
+		};
+	}	  
+	 
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		getMenuInflater().inflate(R.menu.main, menu);
+		return true;
+	}
+	 
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		int id = item.getItemId();
+		if (id == R.id.action_settings) {
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+	 
+	@Override
+	protected void onDestroy () {
+		super.onDestroy();
+		server.stop();
+			serverThread.stop();
+			serverThread.destroy();
+	}
+	 
+	@Override
+	public boolean onTouch(View v, MotionEvent event) {
+		if (event.getAction() == MotionEvent.ACTION_MOVE) CLOSE_APP = 0;
+		if (event.getAction() == MotionEvent.ACTION_DOWN) CLOSE_APP++;
+		if (CLOSE_APP > 3) System.exit(0);
+		return false;	
+	}    
+	 
+	public static final void sss(String comm, String speed) {
+		byte s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0, s6 = 0;
+		boolean front = false, left = false, right = false, back = false, up1 = false, down1 = false, up2 = false, down2 = false, manip1on = false, manip1off = false, manip2on = false, manip2off = false, off = false;
+
+		if (comm != "off") {
+			front = comm.contains("front") && comm != "off";
+			left = comm.contains("left") && comm != "off";
+			right = comm.contains("right") && comm != "off";
+			back = comm.contains("back") && comm != "off";
+			up1 = comm.contains("up1") && comm != "off";
+			down1 = comm.contains("down1") && comm != "off";
+			up2 = comm.contains("up2") && comm != "off";
+			down2 = comm.contains("down2") && comm != "off";
+			manip1on = comm.contains("manip1on") && comm != "off";
+			manip1off = comm.contains("manip1off") && comm != "off";
+			manip2on = comm.contains("manip2on") && comm != "off";
+			manip2off = comm.contains("manip2off") && comm != "off";
+			 
+			s1 = speed.length() >= 3 ? Byte.valueOf(speed.substring(0, 3)) : 0;
+			s2 = speed.length() >= 6 ? Byte.valueOf(speed.substring(3, 6)) : 0;
+			s3 = speed.length() >= 9 ? Byte.valueOf(speed.substring(6, 9)) : 0;
+			s4 = speed.length() >= 12 ? Byte.valueOf(speed.substring(9, 12)) : 0;
+			s5 = speed.length() >= 15 ? Byte.valueOf(speed.substring(12, 15)) : 0;
+			s6 = speed.length() >= 18 ? Byte.valueOf(speed.substring(15, 18)) : 0;
+		};
+		 
+		sendData(front, left, right, back, up1, down1, up2, down2, manip1on, manip1off, manip2on, manip2off, s1, s2, s3, s4, s5, s6);
+		 
+	}
+
+	public void playSound(String filename) {
+		final String fn = filename;
+		String filePath = Environment.getExternalStorageDirectory().getAbsolutePath()+"/"+fn;
+		mediaPlayer = new  MediaPlayer();
+		try {
+			mediaPlayer.setDataSource(filePath);
+			mediaPlayer.prepare();   
+			mediaPlayer.start();
+		} catch (Exception ex) {};
+	};
+	 
+	public static byte b2i(boolean value) {
+		byte one = 1;
+		byte nul = 0;
+		return value ? one : nul;
+	}
+
+	public static final void sendData(boolean front, boolean left, boolean right, boolean back, boolean up1, boolean down1, boolean up2, boolean down2, boolean manip1on, boolean manip1off, boolean manip2on, boolean manip2off, byte val1, byte val2, byte val3, byte val4, byte val5, byte val6){
+		data[12] = (byte) (val1 * b2i(front || left || right || back));//pwm for left front motor
+		data[11] = (byte) (val2 * b2i(front || left || right || back));//pwm for left back motor
+		data[10] = (byte) (val3 * b2i(front || left || right || back));//pwm for right front motor
+		data[9] = (byte) (val4 * b2i(front || left || right || back));//pwm for right back motor
+		data[13]  = (byte) (val5 * b2i(up1 || down1 || up2 || down2));//pwm for left and right hands motors
+		data[4]  = (byte) (val6 * b2i(manip1on || manip1off || manip2on || manip2off));//pwm for left and right hands manipulators motors
+
+		data[22] = b2i(front || right);//rel for left motors -> front
+		data[23] = b2i(left || back);//rel for left motors -> back
+		data[24] = b2i(front || left);//rel for right motors -> front
+		data[25] = b2i(right || back);//rel for right motors -> back
+		
+		data[26] = b2i(up1);//rel for left hand -> up
+		data[27] = b2i(down1);//rel for left hand -> down
+		data[28] = b2i(up2);//rel for right hand -> up
+		data[29] = b2i(down2);//rel right hand -> dowm
+		
+		data[30] = b2i(manip1on);//rel for left hand manipulator -> open
+		data[31] = b2i(manip1off);//rel for left hand manipulator -> close
+		data[32] = b2i(manip2on);//rel for right hand manipulator -> open
+		data[33] = b2i(manip2off);//rel for right hand manipulator -> close
+    		
+//		textView1.setText("13 = " + data[13] + ", 9 = " + data[9]);
+        	
+		try {	 
+				server.send(data);
+		} catch (IOException e) {
+//		 		Toast.makeText(this.getApplicationContext(), "error send", Toast.LENGTH_SHORT).show();
+		}	
+	}
+
+	class ServerThread extends Thread implements Runnable {
+		Socket mySocket;
+		PrintWriter out;
+		BufferedReader in;
+		InputStreamReader is;
+		InputStream inp;
+    	    
+		ServerThread(Socket socket) {
+			Socket mySocket = socket;
+			try {
+				is = new InputStreamReader(mySocket.getInputStream());
+			    in = new BufferedReader(is);
+			    out = new PrintWriter(mySocket.getOutputStream(), true);
+			    out.println("robot-k1:>");
+			} catch(Exception ex) {
+			    ex.printStackTrace();
+			}
+		}
+		
+		public void run() {
+			try {
+			    String str = in.readLine();
+		//	    	    		out.println(str);
+			    h.obtainMessage(1, -1, -1, str).sendToTarget();
+
+			} catch(Exception ex) {
+				ex.printStackTrace();
+			}
+		}
+	}
+	
+	
+	
+}
+
+/*	    
+class ServerAsyncTask extends AsyncTask<Socket, Void, Void> {
+	  @Override
+	  protected Void doInBackground(Socket... params) {
+	   Socket mySocket = params[0];
+	   try {
+	    PrintWriter out = new PrintWriter(mySocket.getOutputStream(), true);
+	    out.println("robot-k1:");
+	    BufferedReader in = new BufferedReader(new InputStreamReader(mySocket.getInputStream()));
+
+	    String str;
+		while (1==1){
+			try{
+	    	    str = in.readLine();
+	    		out.println(str);
+		    	    if (str.contains("front") || str.contains("left") || str.contains("back") || str.contains("right")){
+		    	    	sss(str);
+		    	    }
+			    str = "";	    
+			}catch(Exception ex) {
+			    ex.printStackTrace();
+			}
+		}
+		
+	   } catch (IOException e) {
+	   }
+	   return null;
+	  }
+}    	    
+*/	    
+
+/*	    
+class ServerAsyncTask extends AsyncTask<Socket, Void, String> {
+	  @Override
+	  protected String doInBackground(Socket... params) {
+	   String result = null;
+	   Socket mySocket = params[0];
+	   try {
+	    InputStream is = mySocket.getInputStream();
+	    PrintWriter out = new PrintWriter(
+	      mySocket.getOutputStream(), true);
+	    out.println("Hello, zeus!");
+	    BufferedReader br = new BufferedReader(
+	      new InputStreamReader(is));
+	    result = br.readLine();
+	    mySocket.close();
+	   } catch (IOException e) {
+	    e.printStackTrace();
+	   }
+	   return result;
+	  }
+	 
+	  @Override
+	  protected void onPostExecute(String s) {
+//		  bFront.setText(s);
+	  }
+}*/    	    
