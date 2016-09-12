@@ -41,14 +41,15 @@ public class MainActivity extends Activity implements OnTouchListener {
 	private static final int REQUEST_ENABLE_BT = 1;
 	final int RECIEVE_MESSAGE_BT_CONNECT = 1, RECIEVE_MESSAGE_BT_CONNECTED = 2,
 			RECIEVE_MESSAGE_CLIENT = 3, RECIEVE_MESSAGE_TTS_START = 4,
-			RECEIVE_MESSAGE_TTS_STOP = 5;
+			RECEIVE_MESSAGE_TTS_STOP = 5;// Статус для Handler
 	private BluetoothAdapter btAdapter = null;
 	private StringBuilder sb = new StringBuilder();
-	private static BTConnectedThread mBTConnectedThread;
+	private static BTConnectedThread mBTConnectedThread;// bluetooth server
 	private static final UUID MY_UUID = UUID
-			.fromString("00001101-0000-1000-8000-00805F9B34FB");
+			.fromString("00001101-0000-1000-8000-00805F9B34FB");// SPP UUID
+																// сервиса
 	private static String address = "98:D3:31:80:5B:FF";
-	private BTConnectThread mBTConnectThread = null;
+	private BTConnectThread mBTConnectThread;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -123,16 +124,6 @@ public class MainActivity extends Activity implements OnTouchListener {
 						sss(val.substring(pwmCount * 3),
 								val.substring(0, (pwmCount * 3)));
 
-					} else if (str.contains("BT_OFF")) {
-						//mBTConnectThread.stop();
-						//mBTConnectThread.cancel();
-						//mBTConnectThread = null;
-
-					} else if (str.contains("BT_ON")) {
-						//if (btAdapter != null && btAdapter.isEnabled()) {
-						//	mBTConnectThread = new BTConnectThread(btAdapter, address);
-						//	mBTConnectThread.start();
-						//}
 					} else {
 						speak(str);
 					}
@@ -172,6 +163,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 									}
 								}
 							});
+					speak("привет. создатель.");
 
 					break;
 				case RECEIVE_MESSAGE_TTS_STOP:
@@ -185,7 +177,8 @@ public class MainActivity extends Activity implements OnTouchListener {
 			}
 		};
 
-		btAdapter = BluetoothAdapter.getDefaultAdapter();
+		btAdapter = BluetoothAdapter.getDefaultAdapter(); // получаем локальный
+															// Bluetooth адаптер
 		checkBTState();
 	}
 
@@ -213,10 +206,10 @@ public class MainActivity extends Activity implements OnTouchListener {
 	@Override
 	public void onStart() {
 		super.onStart();
-		//if (btAdapter != null && btAdapter.isEnabled()) {
-		//	mBTConnectThread = new BTConnectThread(btAdapter, address);
-		//	mBTConnectThread.start();
-		//}
+		if (btAdapter != null && btAdapter.isEnabled()) {
+			mBTConnectThread = new BTConnectThread(btAdapter, address);
+			mBTConnectThread.start();
+		}
 
 		mmTtsThread = new TTSThread();
 		mmTtsThread.start();
@@ -359,7 +352,6 @@ public class MainActivity extends Activity implements OnTouchListener {
 			if (btAdapter != null
 					&& btAdapter.isEnabled()
 					&& mBTConnectedThread != null
-					&& mBTConnectThread != null
 					&& mBTConnectThread.mmSocket != null
 					&& mBTConnectThread.mmSocket.getRemoteDevice()
 							.getBondState() == BluetoothDevice.BOND_BONDED) {
@@ -378,15 +370,15 @@ public class MainActivity extends Activity implements OnTouchListener {
 
 	private void checkBTState() {
 		if (btAdapter == null) {
-			errorExit("Fatal Error", "Bluetooth пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ");
+			errorExit("Fatal Error", "Bluetooth не поддерживается");
 		} else {
 			if (btAdapter.isEnabled()) {
 			} else {
 				Toast.makeText(this.getApplicationContext(),
-						"Bluetooth пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ ADB!",
+						"Bluetooth выключен, работаем через ADB!",
 						Toast.LENGTH_SHORT).show();
 				// errorExit("Fatal Error",
-				// "пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ Bluetooth пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!");
+				// "Включите Bluetooth и перезапустите программу!");
 				// Prompt user to turn on Bluetooth
 				// Intent enableBtIntent = new
 				// Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
@@ -438,7 +430,11 @@ public class MainActivity extends Activity implements OnTouchListener {
 			try {
 				while (true) {
 					socClient = socServer.accept();
-					ServerAsyncTask serverAsyncTask = new ServerAsyncTask();
+					ServerAsyncTask serverAsyncTask = new ServerAsyncTask();// асинхр
+																			// задача
+																			// для
+																			// нового
+																			// планшета
 					serverAsyncTask.execute(new Socket[] { socClient });
 
 				}
@@ -463,12 +459,12 @@ public class MainActivity extends Activity implements OnTouchListener {
 
 		public void run() {
 			h.obtainMessage(RECIEVE_MESSAGE_TTS_START, 0, -1, null)
-					.sendToTarget(); 
+					.sendToTarget(); // Отправляем в очередь сообщений Handler
 		}
 
 		public void cancel() {
 			h.obtainMessage(RECEIVE_MESSAGE_TTS_STOP, 0, -1, null)
-					.sendToTarget(); 
+					.sendToTarget(); // Отправляем в очередь сообщений Handler
 		}
 	};
 
@@ -496,7 +492,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 			try {
 				mmSocket.connect();
 				h.obtainMessage(RECIEVE_MESSAGE_BT_CONNECT, -1, -1, mmSocket)
-						.sendToTarget(); 
+						.sendToTarget(); // Отправляем в очередь сообщений
 											// Handler
 			} catch (IOException connectException) {
 				try {
@@ -544,9 +540,13 @@ public class MainActivity extends Activity implements OnTouchListener {
 
 			while (true) {
 				try {
-					bytes = mmInStream.read(buffer);
+					bytes = mmInStream.read(buffer); // Получаем кол-во байт и
+														// само собщение в
+														// байтовый массив
+														// "buffer"
 					h.obtainMessage(RECIEVE_MESSAGE_BT_CONNECTED, bytes, -1,
-							buffer).sendToTarget(); 
+							buffer).sendToTarget(); // Отправляем в очередь
+													// сообщений Handler
 				} catch (IOException e) {
 					break;
 				}
