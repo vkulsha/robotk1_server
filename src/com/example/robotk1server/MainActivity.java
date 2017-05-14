@@ -2,12 +2,12 @@ package com.example.robotk1server;
 
 import com.example.robotk1server.R;
 
-import org.microbridge.server.Server;
-import org.microbridge.server.AbstractServerListener;
+//import org.microbridge.server.Server;
+//import org.microbridge.server.AbstractServerListener;
 
 import android.os.*;
 import android.app.Activity;
-import android.bluetooth.*;
+//import android.bluetooth.*;
 import android.view.*;
 import android.view.View.OnTouchListener;
 import android.view.ViewGroup.LayoutParams;
@@ -29,7 +29,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 	MediaPlayer mediaPlayer;
 	TextToSpeech tts;
 
-	static Server mAdbServer = null;// adb server
+/*	static Server mAdbServer = null;// adb server*/
 	static byte[] data = new byte[54];
 	static String dataBT = "";
 	private final int SERVER_PORT = 4567; // Define the server port
@@ -42,7 +42,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 	final int RECIEVE_MESSAGE_BT_CONNECT = 1, RECIEVE_MESSAGE_BT_CONNECTED = 2,
 			RECIEVE_MESSAGE_CLIENT = 3, RECIEVE_MESSAGE_TTS_START = 4,
 			RECEIVE_MESSAGE_TTS_STOP = 5;
-	private BluetoothAdapter btAdapter = null;
+/*	private BluetoothAdapter btAdapter = null;*/
 	private StringBuilder sb = new StringBuilder();
 	private static BTConnectedThread mBTConnectedThread;
 	private static final UUID MY_UUID = UUID
@@ -61,7 +61,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 		setContentView(R.layout.activity_main);
 		context = this.getApplicationContext();
 
-		try {
+/*		try {
 			mAdbServer = new Server(4568); // ADK-port
 			mAdbServer.start();
 
@@ -77,34 +77,36 @@ public class MainActivity extends Activity implements OnTouchListener {
 					byte[] data) {
 			}
 		});
-
+*/
 		serverThread = new ServerThread(SERVER_PORT);
 		serverThread.start();
 
 		String videoSource = "/sdcard/morg.mp4";
-		videoView = (VideoView) findViewById(R.id.videoView1);
-		videoView.setOnCompletionListener(new OnCompletionListener() {
-			@Override
-			public void onCompletion(MediaPlayer mp) {
-				videoView.resume();
-			}
-		});
-
-		videoView.setOnPreparedListener(new OnPreparedListener() {
-			@Override
-			public void onPrepared(MediaPlayer mp) {
-				mp.setLooping(true);
-				videoView.start();
-			}
-		});
-
-		videoView.setVideoPath(videoSource);
-		MediaController mc = new MediaController(this);
-		mc.setVisibility(View.INVISIBLE);
-		videoView.setMediaController(mc);
-		videoView.requestFocus(0);
-		videoView.start();
-
+		File f = new File(videoSource);
+		if (f.exists()) {
+			videoView = (VideoView) findViewById(R.id.videoView1);
+			videoView.setOnCompletionListener(new OnCompletionListener() {
+				@Override
+				public void onCompletion(MediaPlayer mp) {
+					videoView.resume();
+				}
+			});
+	
+			videoView.setOnPreparedListener(new OnPreparedListener() {
+				@Override
+				public void onPrepared(MediaPlayer mp) {
+					mp.setLooping(true);
+					videoView.start();
+				}
+			});
+	
+			videoView.setVideoPath(videoSource);
+			MediaController mc = new MediaController(this);
+			mc.setVisibility(View.INVISIBLE);
+			videoView.setMediaController(mc);
+			videoView.requestFocus(0);
+			videoView.start();
+		}
 		// playSound("nosound.m4a");
 
 		for (int i = 0; i <= 53; i++) {
@@ -138,7 +140,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 					}
 					break;
 				case RECIEVE_MESSAGE_BT_CONNECT:
-					BluetoothSocket mmSocket;
+/*					BluetoothSocket mmSocket;
 					mmSocket = (BluetoothSocket) msg.obj;
 					if (mmSocket.getRemoteDevice().getBondState() == BluetoothDevice.BOND_BONDED) {
 						Toast.makeText(context, "Bluetooth connected!",
@@ -147,7 +149,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 
 					mBTConnectedThread = new BTConnectedThread(mmSocket);
 					mBTConnectedThread.start();
-					break;
+*/					break;
 				case RECIEVE_MESSAGE_BT_CONNECTED:
 					byte[] readBuf = (byte[]) msg.obj;
 					String strIncom = new String(readBuf, 0, msg.arg1);
@@ -185,8 +187,8 @@ public class MainActivity extends Activity implements OnTouchListener {
 			}
 		};
 
-		btAdapter = BluetoothAdapter.getDefaultAdapter();
-		checkBTState();
+/*		btAdapter = BluetoothAdapter.getDefaultAdapter();
+		checkBTState();*/
 	}
 
 	public void speak(String txt) {
@@ -242,12 +244,12 @@ public class MainActivity extends Activity implements OnTouchListener {
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		if (btAdapter != null && btAdapter.isEnabled()) {
+/*		if (btAdapter != null && btAdapter.isEnabled()) {
 			mBTConnectThread.cancel();
 		}
 		mmTtsThread.cancel();
 
-		mAdbServer.stop();
+		mAdbServer.stop();*/
 		serverThread.cancel();
 		// serverThread.stop();
 		// serverThread.destroy();
@@ -355,7 +357,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 	}
 
 	public void sendControlData(byte[] data) {
-		try {
+/*		try {
 			if (btAdapter != null
 					&& btAdapter.isEnabled()
 					&& mBTConnectedThread != null
@@ -372,12 +374,12 @@ public class MainActivity extends Activity implements OnTouchListener {
 		} catch (IOException e) {
 			Toast.makeText(this.getApplicationContext(), "error send",
 					Toast.LENGTH_SHORT).show();
-		}
+		}*/
 
 	}
 
 	private void checkBTState() {
-		if (btAdapter == null) {
+/*		if (btAdapter == null) {
 			errorExit("Fatal Error", "Bluetooth �� ��������������");
 		} else {
 			if (btAdapter.isEnabled()) {
@@ -392,7 +394,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 				// Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 				// startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
 			}
-		}
+		}*/
 	}
 
 	private void errorExit(String title, String message) {
@@ -473,7 +475,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 	};
 
 	class BTConnectThread extends Thread {
-		private final BluetoothSocket mmSocket;
+/*		private final BluetoothSocket mmSocket;
 		private final BluetoothDevice mmDevice;
 		private final BluetoothAdapter mmAdapter;
 		String tmpAddress;
@@ -513,11 +515,11 @@ public class MainActivity extends Activity implements OnTouchListener {
 				mmSocket.close();
 			} catch (IOException e) {
 			}
-		}
+		}*/
 	}
 
 	private class BTConnectedThread extends Thread {
-		private final BluetoothSocket mmSocket;
+/*		private final BluetoothSocket mmSocket;
 		private final InputStream mmInStream;
 		private final OutputStream mmOutStream;
 
@@ -573,7 +575,7 @@ public class MainActivity extends Activity implements OnTouchListener {
 				mmSocket.close();
 			} catch (IOException e) {
 			}
-		}
+		}*/
 	}
 
 }
